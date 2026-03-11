@@ -39,7 +39,6 @@
     <div id="main-content">
         <h1>Research Tasks</h1>
         
-
         <div class="input-group">
             <input type="text" id="new-task-title" placeholder="タスク内容 (例: $E=mc^2$)" style="flex:2">
             <input type="date" id="new-task-date" style="flex:1">
@@ -63,17 +62,18 @@
     </div>
 
     <script type="module">
-        // --- Firebase 設定 (ここをご自身のものに！) ---
+        // --- Firebase 設定 ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        // 修正: onSnapshot を削除し、getDoc を追加しました
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyDjnlxV-O5KXmTPlNRmyYIngygjyjvWSEY",
-            authDomain: "my-research-todo.firebaseapp.com",
-            projectId: "my-research-todo",
-            storageBucket: "my-research-todo.firebasestorage.app",
-            messagingSenderId: "23018762664",
-            appId: "1:23018762664:web:7aa9046b27f18181d5ed9d"
+              apiKey: "AIzaSyDjnlxV-O5KXmTPlNRmyYIngygjyjvWSEY",
+              authDomain: "my-research-todo.firebaseapp.com",
+              projectId: "my-research-todo",
+              storageBucket: "my-research-todo.firebasestorage.app",
+              messagingSenderId: "23018762664",
+              appId: "1:23018762664:web:7aa9046b27f18181d5ed9d"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -83,17 +83,28 @@
         // --- データ管理ロジック ---
         window.tasks = [];
 
-        // クラウドからデータ取得
-        onSnapshot(doc(db, "todo_lists", userDocId), (docSnap) => {
-            if (docSnap.exists()) {
-                window.tasks = docSnap.data().tasks || [];
-                render();
+        // 修正: ページ読み込み時に1回だけデータを取得する関数
+        async function loadData() {
+            try {
+                const docRef = doc(db, "todo_lists", userDocId);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    window.tasks = docSnap.data().tasks || [];
+                    render(false); // false を渡すことで、読み込み直後の無駄な「保存」を防ぎます
+                }
+            } catch (e) {
+                console.error("データの読み込みに失敗しました:", e);
             }
-        });
+        }
 
         // クラウドへ保存
         window.saveToCloud = async function() {
-            await setDoc(doc(db, "todo_lists", userDocId), { tasks: window.tasks, updatedAt: new Date() });
+            try {
+                await setDoc(doc(db, "todo_lists", userDocId), { tasks: window.tasks, updatedAt: new Date() });
+                console.log("クラウドに保存しました");
+            } catch (e) {
+                console.error("保存に失敗しました:", e);
+            }
         };
 
         // --- アプリケーション操作関数 ---
@@ -113,7 +124,7 @@
                 id: Date.now(), title, memo: "", date,
                 isBacklog: date === "", done: false, showMemo: false, isArchived: false
             });
-            render();
+            render(); // デフォルトで shouldSave = true となり保存されます
             document.getElementById('new-task-title').value = "";
         };
 
@@ -156,12 +167,11 @@
         window.unarchiveTask = function(id) {
             const task = window.tasks.find(t => t.id === id);
             task.isArchived = false;
-            // 完了チェックも外す場合は以下を有効に（お好みで）
-            // task.done = false;
             render();
         };
 
-        window.render = function() {
+        // 修正: 引数 shouldSave を追加し、デフォルトを true にしました
+        window.render = function(shouldSave = true) {
             const scheduledDiv = document.getElementById('scheduled-list');
             const backlogDiv = document.getElementById('backlog-list');
             const archiveDiv = document.getElementById('archive-list');
@@ -174,7 +184,7 @@
             window.tasks.forEach(task => {
                 // --- アーカイブ済みタスクの表示 ---
                 if (task.isArchived) {
-                const archItem = document.createElement('div');
+                    const archItem = document.createElement('div');
                     archItem.className = "archive-item";
                     archItem.style.display = "flex";
                     archItem.style.justifyContent = "space-between";
@@ -187,7 +197,7 @@
                     return; // アーカイブ済みならここで終了
                 }
 
-                // --- 現役タスクの表示 (既存の処理) ---
+                // --- 現役タスクの表示 ---
                 const item = document.createElement('div');
                 item.className = `todo-item ${task.done ? 'done' : ''}`;
                 item.innerHTML = `
@@ -225,9 +235,15 @@
                 });
             });
 
-            // クラウド保存を実行
-            if (typeof window.saveToCloud === "function") window.saveToCloud();
+            // 修正: shouldSave が true の時だけクラウド保存を実行
+            if (shouldSave && typeof window.saveToCloud === "function") {
+                window.saveToCloud();
+            }
         };
+
+        // 修正: 最後に1回だけデータ読み込みを実行してアプリをスタート
+        loadData();
+
     </script>
 </body>
 </html>
