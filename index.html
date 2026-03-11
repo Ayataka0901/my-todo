@@ -1,392 +1,233 @@
 <!DOCTYPE html>
-
 <html lang="ja">
-
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Research ToDo Pro</title>
-
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-
     <style>
-
         :root { --main-bg: #f5f5f7; --card-bg: #ffffff; --accent: #007aff; }
-
         body { font-family: -apple-system, sans-serif; background: var(--main-bg); margin: 0; padding: 20px; color: #333; }
-
         #auth-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
-
         #main-content { display: none; max-width: 1000px; margin: 0 auto; }
-
         .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-
         @media (max-width: 800px) { .container { grid-template-columns: 1fr; } }
-
         .list-card { background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); align-self: start; }
-
         .todo-item { border-bottom: 1px solid #eee; padding: 10px 0; }
-
         .todo-main { display: flex; align-items: flex-start; gap: 10px; }
-
         .todo-item.done .task-text { text-decoration: line-through; color: #888; }
-
         .memo-area { margin: 10px 0 0 30px; background: #f9f9f9; padding: 8px; border-radius: 6px; font-size: 0.9em; border-left: 3px solid var(--accent); }
-
         .memo-content-display { cursor: pointer; min-height: 1em; }
-
         .memo-edit { width: 100%; box-sizing: border-box; font-family: monospace; padding: 5px; margin-top: 5px; }
-
         .input-group { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; background: #fff; padding: 15px; border-radius: 12px; }
-
         input, button, textarea { border-radius: 6px; border: 1px solid #ccc; padding: 8px; }
-
         button { background: var(--accent); color: white; border: none; cursor: pointer; }
-
         .date-edit { font-size: 0.8em; padding: 2px; border: none; background: #f0f0f0; color: #666; }
-
         .archive-section { grid-column: 1 / -1; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 10px; }
-
         .archive-item { font-size: 0.85em; color: #777; padding: 4px 0; border-bottom: 1px dashed #ddd; }
-
     </style>
-
 </head>
-
 <body>
 
-
     <div id="auth-overlay">
-
         <h2>Research Task Manager</h2>
-
         <input type="password" id="pass-input" placeholder="パスワードを入力">
-
         <button onclick="checkPass()" style="margin-top:10px">ログイン</button>
-
     </div>
 
-
     <div id="main-content">
-
         <h1>Research Tasks</h1>
-
         
 
         <div class="input-group">
-
             <input type="text" id="new-task-title" placeholder="タスク内容 (例: $E=mc^2$)" style="flex:2">
-
             <input type="date" id="new-task-date" style="flex:1">
-
             <button onclick="addTask()">追加</button>
-
         </div>
-
 
         <div class="container">
-
             <div class="list-card">
-
                 <h3>📅 スケジュール済み</h3>
-
                 <div id="scheduled-list"></div>
-
             </div>
-
             <div class="list-card">
-
                 <h3>📥 保留（Backlog）</h3>
-
                 <div id="backlog-list"></div>
-
             </div>
-
             <div class="archive-section">
-
                 <h4 onclick="toggleArchive()" style="cursor:pointer">📦 アーカイブ済みタスク (クリックで開閉)</h4>
-
                 <div id="archive-list" style="display:none"></div>
-
             </div>
-
         </div>
-
     </div>
 
-
     <script type="module">
-
         // --- Firebase 設定 (ここをご自身のものに！) ---
-
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-
         const firebaseConfig = {
-
             apiKey: "AIzaSyDjnlxV-O5KXmTPlNRmyYIngygjyjvWSEY",
-
             authDomain: "my-research-todo.firebaseapp.com",
-
             projectId: "my-research-todo",
-
             storageBucket: "my-research-todo.firebasestorage.app",
-
             messagingSenderId: "23018762664",
-
             appId: "1:23018762664:web:7aa9046b27f18181d5ed9d"
-
         };
-
 
         const app = initializeApp(firebaseConfig);
-
         const db = getFirestore(app);
-
         const userDocId = "my-research-tasks";
 
-
         // --- データ管理ロジック ---
-
         window.tasks = [];
 
-
         // クラウドからデータ取得
-
         onSnapshot(doc(db, "todo_lists", userDocId), (docSnap) => {
-
             if (docSnap.exists()) {
-
                 window.tasks = docSnap.data().tasks || [];
-
                 render();
-
             }
-
         });
 
-
         // クラウドへ保存
-
         window.saveToCloud = async function() {
-
             await setDoc(doc(db, "todo_lists", userDocId), { tasks: window.tasks, updatedAt: new Date() });
-
         };
-
 
         // --- アプリケーション操作関数 ---
-
         window.checkPass = function() {
-
             const pass = document.getElementById('pass-input').value;
-
             if (pass === "lab123") { // パスワード
-
                 document.getElementById('auth-overlay').style.display = 'none';
-
                 document.getElementById('main-content').style.display = 'block';
-
             } else { alert("Wrong password"); }
-
         };
-
 
         window.addTask = function() {
-
             const title = document.getElementById('new-task-title').value;
-
             const date = document.getElementById('new-task-date').value;
-
             if (!title) return;
-
             window.tasks.push({
-
                 id: Date.now(), title, memo: "", date,
-
                 isBacklog: date === "", done: false, showMemo: false, isArchived: false
-
             });
-
             render();
-
             document.getElementById('new-task-title').value = "";
-
         };
-
 
         window.toggleTask = function(id) {
-
             const task = window.tasks.find(t => t.id === id);
-
             task.done = !task.done;
-
             render();
-
         };
-
 
         window.updateDate = function(id, newDate) {
-
             const task = window.tasks.find(t => t.id === id);
-
             task.date = newDate;
-
             task.isBacklog = (newDate === "");
-
             render();
-
         };
-
 
         window.archiveTask = function(id) {
-
             const task = window.tasks.find(t => t.id === id);
-
             task.isArchived = true;
-
             render();
-
         };
-
 
         window.toggleMemoView = function(id) {
-
             const task = window.tasks.find(t => t.id === id);
-
             task.showMemo = !task.showMemo;
-
             render();
-
         };
-
 
         window.saveMemo = function(id, newText) {
-
             const task = window.tasks.find(t => t.id === id);
-
             task.memo = newText;
-
             render();
-
         };
-
 
         window.toggleArchive = function() {
-
             const el = document.getElementById('archive-list');
-
             el.style.display = (el.style.display === 'none') ? 'block' : 'none';
-
         };
 
+        window.unarchiveTask = function(id) {
+            const task = window.tasks.find(t => t.id === id);
+            task.isArchived = false;
+            // 完了チェックも外す場合は以下を有効に（お好みで）
+            // task.done = false;
+            render();
+        };
 
         window.render = function() {
-
             const scheduledDiv = document.getElementById('scheduled-list');
-
             const backlogDiv = document.getElementById('backlog-list');
-
             const archiveDiv = document.getElementById('archive-list');
-
-            scheduledDiv.innerHTML = ""; backlogDiv.innerHTML = ""; archiveDiv.innerHTML = "";
-
+    
+            // 一旦クリア
+            scheduledDiv.innerHTML = ""; 
+            backlogDiv.innerHTML = ""; 
+            archiveDiv.innerHTML = "";
 
             window.tasks.forEach(task => {
-
+                // --- アーカイブ済みタスクの表示 ---
                 if (task.isArchived) {
-
-                    const archItem = document.createElement('div');
-
+                const archItem = document.createElement('div');
                     archItem.className = "archive-item";
-
-                    archItem.innerHTML = `<span>✓ ${task.title} (${task.date || '保留'})</span>`;
-
+                    archItem.style.display = "flex";
+                    archItem.style.justifyContent = "space-between";
+                    archItem.style.alignItems = "center";
+                    archItem.innerHTML = `
+                        <span>✓ ${task.title} <small>(${task.date || '保留'})</small></span>
+                        <button onclick="unarchiveTask(${task.id})" style="background:#e5e5ea; color:#333; font-size:10px; padding:2px 5px;">↩️ 戻す</button>
+                    `;
                     archiveDiv.appendChild(archItem);
-
-                    return;
-
+                    return; // アーカイブ済みならここで終了
                 }
 
-
+                // --- 現役タスクの表示 (既存の処理) ---
                 const item = document.createElement('div');
-
                 item.className = `todo-item ${task.done ? 'done' : ''}`;
-
                 item.innerHTML = `
-
                     <div class="todo-main">
-
                         <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTask(${task.id})">
-
                         <div style="flex:1">
-
                             <span class="task-text">${task.title}</span>
-
                             <div>
-
                                 <input type="date" class="date-edit" value="${task.date}" onchange="updateDate(${task.id}, this.value)">
-
                             </div>
-
                             <button class="memo-toggle" style="background:none;color:var(--accent);border:none;font-size:0.8em;padding:0;text-decoration:underline;cursor:pointer;" onclick="toggleMemoView(${task.id})">
-
                                 ${task.memo ? '📝 メモ表示' : '+ メモ追加'}
-
                             </button>
-
                         </div>
-
-                        ${task.done ? `<button onclick="archiveTask(${task.id})" style="background:#eee;color:#333;font-size:12px;">📦</button>` : ''}
-
+                        ${task.done ? `<button onclick="archiveTask(${task.id})" style="background:#eee;color:#333;font-size:12px;padding:4px 8px;">📦</button>` : ''}
                     </div>
-
                     <div class="memo-area" id="memo-${task.id}" style="display: ${task.showMemo ? 'block' : 'none'}">
-
                         <div class="memo-content-display" onclick="this.nextElementSibling.style.display='block';this.style.display='none';this.nextElementSibling.nextElementSibling.style.display='block'">${task.memo || 'クリックしてメモを入力'}</div>
-
                         <textarea class="memo-edit" style="display:none" rows="3">${task.memo}</textarea>
-
                         <button style="display:none;margin-top:5px;font-size:10px;" onclick="saveMemo(${task.id}, this.previousElementSibling.value)">保存</button>
-
                     </div>
-
                 `;
 
-
-                if (task.isBacklog) { backlogDiv.appendChild(item); } else { scheduledDiv.appendChild(item); }
-
+                if (task.isBacklog) { 
+                    backlogDiv.appendChild(item); 
+                } else { 
+                    scheduledDiv.appendChild(item); 
+                }
             });
 
-
-            // 数式表示の適用
-
+            // 数式表示
             document.querySelectorAll('.task-text, .memo-content-display, .archive-item span').forEach(el => {
-
                 el.innerHTML = el.innerHTML.replace(/\$(.*?)\$/g, (match, formula) => {
-
                     return katex.renderToString(formula, { throwOnError: false });
-
                 });
-
             });
 
-
-            // 保存
-
+            // クラウド保存を実行
             if (typeof window.saveToCloud === "function") window.saveToCloud();
-
         };
-
     </script>
-
 </body>
-
 </html>
