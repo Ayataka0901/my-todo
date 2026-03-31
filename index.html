@@ -27,7 +27,7 @@
         .archive-section { grid-column: 1 / -1; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 10px; }
         .archive-item { font-size: 0.85em; color: #777; padding: 6px 0; border-bottom: 1px dashed #ddd; }
         .bulk-delete-bar { text-align: right; margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 6px; font-size: 0.9em; box-shadow: inset 0 0 5px rgba(0,0,0,0.05); }
-        .task-title-edit { font-family: inherit; font-size: 1em; padding: 2px 5px; border: 1px solid var(--accent); border-radius: 4px; }
+        .task-title-edit, .subtask-edit { font-family: inherit; font-size: 1em; padding: 2px 5px; border: 1px solid var(--accent); border-radius: 4px; }
         
         .label-chip { background: #e5e5ea; color: #333; border-radius: 10px; padding: 2px 8px; font-size: 0.75em; margin-right: 4px; display: inline-block; font-weight: 500; }
         .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; padding: 10px; background: #fff; border-radius: 8px; align-items: center; }
@@ -36,11 +36,11 @@
         .filter-btn.active { background: var(--accent); color: white; font-weight: bold; }
         .filter-label-text { font-size: 0.9em; font-weight: bold; color: #666; margin-right: 10px; }
         
-        /* サブタスク用のスタイル */
         .subtasks-area { margin-top: 8px; margin-bottom: 4px; padding-left: 10px; border-left: 2px solid #e0e0e0; display: flex; flex-direction: column; gap: 4px; }
         .subtask-item { display: flex; align-items: center; font-size: 0.85em; }
         .subtask-input { font-size: 0.8em; padding: 3px 6px; border: 1px dashed #ccc; border-radius: 4px; width: 80%; background: transparent; transition: all 0.2s; }
         .subtask-input:focus { border: 1px solid var(--accent); outline: none; background: #fff; }
+        .subtask-text-display { cursor: text; }
     </style>
 </head>
 <body>
@@ -57,7 +57,9 @@
         <div class="input-group">
             <input type="text" id="new-task-title" placeholder="タスク内容 (例: $E=mc^2$)" style="flex:3">
             <input type="date" id="new-task-date" style="flex:1" title="日付">
-            <input type="time" id="new-task-time" style="flex:1" title="時間">
+            <input type="time" id="new-task-time-start" style="flex:0.8" title="開始時間">
+            <span style="align-self:center">~</span>
+            <input type="time" id="new-task-time-end" style="flex:0.8" title="終了時間">
             <input type="text" id="new-task-labels" placeholder="ラベル(例: 論文, 実験)" style="flex:1.5">
             <button onclick="addTask()">追加</button>
         </div>
@@ -77,11 +79,6 @@
             <div class="archive-section">
                 <h4 onclick="toggleArchive()" style="cursor:pointer">📦 アーカイブ済みタスク (クリックで開閉)</h4>
                 <div id="archive-wrap" style="display:none">
-                    <div class="bulk-delete-bar">
-                        <label>期間を指定して一括整理: </label>
-                        <input type="month" id="archive-delete-month">
-                        <button onclick="bulkDeleteArchive()" style="background: #ff3b30; color: white; border: none; border-radius: 4px; padding: 4px 8px; margin-left: 5px; cursor: pointer;">以前の項目を削除</button>
-                    </div>
                     <div id="archive-list"></div>
                 </div>
             </div>
@@ -106,7 +103,7 @@
         const userDocId = "my-research-tasks";
 
         window.tasks = [];
-        window.currentFilters = []; // AND検索用に配列に変更
+        window.currentFilters = [];
 
         async function loadData() {
             try {
@@ -116,22 +113,16 @@
                     window.tasks = docSnap.data().tasks || [];
                     render(false); 
                 }
-            } catch (e) {
-                console.error("データの読み込みに失敗しました:", e);
-            }
+            } catch (e) { console.error("Load failed:", e); }
         }
 
         window.saveToCloud = async function() {
-            try {
-                await setDoc(doc(db, "todo_lists", userDocId), { tasks: window.tasks, updatedAt: new Date() });
-            } catch (e) {
-                console.error("保存に失敗しました:", e);
-            }
+            try { await setDoc(doc(db, "todo_lists", userDocId), { tasks: window.tasks, updatedAt: new Date() }); } 
+            catch (e) { console.error("Save failed:", e); }
         };
 
         window.checkPass = function() {
-            const pass = document.getElementById('pass-input').value;
-            if (pass === "lab123") { 
+            if (document.getElementById('pass-input').value === "lab123") { 
                 document.getElementById('auth-overlay').style.display = 'none';
                 document.getElementById('main-content').style.display = 'block';
             } else { alert("Wrong password"); }
@@ -140,244 +131,155 @@
         window.addTask = function() {
             const title = document.getElementById('new-task-title').value;
             const date = document.getElementById('new-task-date').value;
-            const time = document.getElementById('new-task-time').value;
+            const timeStart = document.getElementById('new-task-time-start').value;
+            const timeEnd = document.getElementById('new-task-time-end').value;
             const labelsInput = document.getElementById('new-task-labels').value;
             
             if (!title) return;
-
             const labels = labelsInput.split(',').map(l => l.trim()).filter(l => l);
 
             window.tasks.push({
-                id: Date.now(), title, memo: "", date, time: time || "", labels: labels, subtasks: [], // サブタスク配列を初期化
-                isBacklog: date === "", done: false, showMemo: false, isArchived: false
+                id: Date.now(), title, memo: "", date, time: timeStart || "", timeEnd: timeEnd || "", 
+                labels, subtasks: [], isBacklog: date === "", done: false, showMemo: false, isArchived: false
             });
             render(); 
-            
-            document.getElementById('new-task-title').value = "";
-            document.getElementById('new-task-time').value = "";
-            document.getElementById('new-task-labels').value = "";
+            ["new-task-title", "new-task-time-start", "new-task-time-end", "new-task-labels"].forEach(id => document.getElementById(id).value = "");
         };
 
-        window.toggleTask = function(id) { const task = window.tasks.find(t => t.id === id); if(task) { task.done = !task.done; render(); } };
-        window.updateTitle = function(id, newTitle) { const task = window.tasks.find(t => t.id === id); if (task && newTitle.trim() !== "") { task.title = newTitle; render(); } };
-        window.updateDate = function(id, newDate) { const task = window.tasks.find(t => t.id === id); if(task) { task.date = newDate; task.isBacklog = (newDate === ""); render(); } };
-        window.updateTime = function(id, newTime) { const task = window.tasks.find(t => t.id === id); if(task) { task.time = newTime; render(); } };
-        
-        window.clearDateTime = function(id) {
-            const task = window.tasks.find(t => t.id === id);
-            if(task) { task.date = ""; task.time = ""; task.isBacklog = true; render(); }
-        };
+        // 基本操作
+        window.toggleTask = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.done = !t.done; render(); } };
+        window.updateTitle = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t && val.trim()){ t.title = val; render(); } };
+        window.updateDate = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.date = val; t.isBacklog = (val === ""); render(); } };
+        window.updateTime = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.time = val; render(); } };
+        window.updateTimeEnd = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.timeEnd = val; render(); } };
+        window.clearDateTime = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.date = ""; t.time = ""; t.timeEnd = ""; t.isBacklog = true; render(); } };
 
-        // --- サブタスク用関数 ---
+        // サブタスク操作
         window.addSubtask = function(taskId, text) {
-            const task = window.tasks.find(t => t.id === taskId);
-            if(task) {
-                if(!task.subtasks) task.subtasks = []; // 互換性のため
-                task.subtasks.push({ id: Date.now() + Math.random(), text: text, done: false });
-                render();
-            }
+            const t = window.tasks.find(t => t.id === taskId);
+            if(t) { t.subtasks.push({ id: Date.now() + Math.random(), text, done: false }); render(); }
         };
-        window.toggleSubtask = function(taskId, subtaskId) {
-            const task = window.tasks.find(t => t.id === taskId);
-            if(task && task.subtasks) {
-                const st = task.subtasks.find(s => s.id === subtaskId);
-                if(st) st.done = !st.done;
-                render();
-            }
+        window.toggleSubtask = function(taskId, subId) {
+            const t = window.tasks.find(t => t.id === taskId);
+            const st = t?.subtasks.find(s => s.id === subId);
+            if(st){ st.done = !st.done; render(); }
         };
-        window.deleteSubtask = function(taskId, subtaskId) {
-            const task = window.tasks.find(t => t.id === taskId);
-            if(task && task.subtasks) {
-                task.subtasks = task.subtasks.filter(s => s.id !== subtaskId);
-                render();
-            }
+        window.updateSubtaskText = function(taskId, subId, val) {
+            const t = window.tasks.find(t => t.id === taskId);
+            const st = t?.subtasks.find(s => s.id === subId);
+            if(st && val.trim()){ st.text = val; render(); }
+        };
+        window.deleteSubtask = function(taskId, subId) {
+            const t = window.tasks.find(t => t.id === taskId);
+            if(t){ t.subtasks = t.subtasks.filter(s => s.id !== subId); render(); }
         };
 
-        window.archiveTask = function(id) { const task = window.tasks.find(t => t.id === id); if(task) { task.isArchived = true; render(); } };
-        window.toggleMemoView = function(id) { const task = window.tasks.find(t => t.id === id); if(task) { task.showMemo = !task.showMemo; render(); } };
-        window.saveMemo = function(id, newText) { const task = window.tasks.find(t => t.id === id); if(task) { task.memo = newText; render(); } };
+        // その他
+        window.archiveTask = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.isArchived = true; render(); } };
+        window.unarchiveTask = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.isArchived = false; render(); } };
+        window.deleteTask = function(id) { if(confirm("完全に削除しますか？")){ window.tasks = window.tasks.filter(t => t.id !== id); render(); } };
+        window.updateLabels = function(id, str) { const t = window.tasks.find(t => t.id === id); if(t){ t.labels = str.split(',').map(l => l.trim()).filter(l => l); render(); } };
+        window.toggleMemoView = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.showMemo = !t.showMemo; render(); } };
+        window.saveMemo = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.memo = val; render(); } };
         window.toggleArchive = function() { const el = document.getElementById('archive-wrap'); el.style.display = (el.style.display === 'none') ? 'block' : 'none'; };
-        window.unarchiveTask = function(id) { const task = window.tasks.find(t => t.id === id); if(task) { task.isArchived = false; render(); } };
-        window.deleteTask = function(id) { if (confirm("このタスクを完全に削除しますか？")) { window.tasks = window.tasks.filter(t => t.id !== id); render(); } };
-        window.updateLabels = function(id, labelsString) { const task = window.tasks.find(t => t.id === id); if(task) { task.labels = labelsString.split(',').map(l => l.trim()).filter(l => l); render(); } };
-        
-        // 【変更】AND検索用に配列を操作するように修正
+
         window.setFilter = function(label) { 
-            if (label === null) {
-                window.currentFilters = []; // すべて表示
-            } else {
-                const index = window.currentFilters.indexOf(label);
-                if (index > -1) {
-                    window.currentFilters.splice(index, 1); // すでに選択されていれば解除
-                } else {
-                    window.currentFilters.push(label); // 新規選択なら追加
-                }
+            if (label === null) window.currentFilters = [];
+            else {
+                const idx = window.currentFilters.indexOf(label);
+                idx > -1 ? window.currentFilters.splice(idx, 1) : window.currentFilters.push(label);
             }
             render(false); 
         };
 
-        window.bulkDeleteArchive = function() {
-            const monthInput = document.getElementById('archive-delete-month').value; 
-            if (!monthInput) { alert("削除する期間（年月）を指定してください。"); return; }
-            if (confirm(`${monthInput} 以前のアーカイブ済みタスクをすべて削除しますか？`)) {
-                window.tasks = window.tasks.filter(task => {
-                    if (!task.isArchived || !task.date) return true; 
-                    return task.date.substring(0, 7) > monthInput; 
-                });
-                render();
-            }
-        };
-
         window.render = function(shouldSave = true) {
-            const scheduledDiv = document.getElementById('scheduled-list');
-            const backlogDiv = document.getElementById('backlog-list');
-            const archiveDiv = document.getElementById('archive-list');
-            const filterContainer = document.getElementById('filter-container');
-    
-            scheduledDiv.innerHTML = ""; 
-            backlogDiv.innerHTML = ""; 
-            archiveDiv.innerHTML = "";
-            filterContainer.innerHTML = "";
+            const schedDiv = document.getElementById('scheduled-list'), backDiv = document.getElementById('backlog-list'), archDiv = document.getElementById('archive-list'), filtDiv = document.getElementById('filter-container');
+            [schedDiv, backDiv, archDiv, filtDiv].forEach(d => d.innerHTML = "");
 
             window.tasks.sort((a, b) => {
-                if (!a.date && !b.date) return b.id - a.id; 
-                if (!a.date) return 1;  
-                if (!b.date) return -1; 
-                
-                if (a.date !== b.date) return a.date.localeCompare(b.date);
-                
-                const timeA = a.time || "23:59";
-                const timeB = b.time || "23:59";
-                return timeA.localeCompare(timeB);
+                if (!a.date && !b.date) return b.id - a.id;
+                if (!a.date) return 1; if (!b.date) return -1;
+                return a.date !== b.date ? a.date.localeCompare(b.date) : (a.time || "23:59").localeCompare(b.time || "23:59");
             });
 
             const allLabels = new Set();
-            window.tasks.forEach(t => { if (t.labels) t.labels.forEach(l => allLabels.add(l)); });
-            
+            window.tasks.forEach(t => t.labels?.forEach(l => allLabels.add(l)));
             if (allLabels.size > 0) {
-                filterContainer.style.display = "flex";
-                filterContainer.innerHTML = `<span class="filter-label-text">🏷️ ラベルで絞り込み (AND):</span>`;
-                
-                const allBtn = document.createElement('button');
-                allBtn.className = `filter-btn ${window.currentFilters.length === 0 ? 'active' : ''}`;
-                allBtn.innerText = "すべて表示";
-                allBtn.onclick = () => setFilter(null);
-                filterContainer.appendChild(allBtn);
-
-                allLabels.forEach(label => {
-                    const btn = document.createElement('button');
-                    // 選択されているラベルはactiveにする
-                    btn.className = `filter-btn ${window.currentFilters.includes(label) ? 'active' : ''}`;
-                    btn.innerText = label;
-                    btn.onclick = () => setFilter(label);
-                    filterContainer.appendChild(btn);
+                filtDiv.style.display = "flex";
+                filtDiv.innerHTML = `<span class="filter-label-text">🏷️ AND検索:</span>`;
+                const btn = document.createElement('button');
+                btn.className = `filter-btn ${window.currentFilters.length === 0 ? 'active' : ''}`;
+                btn.innerText = "すべて"; btn.onclick = () => setFilter(null); filtDiv.appendChild(btn);
+                allLabels.forEach(l => {
+                    const b = document.createElement('button');
+                    b.className = `filter-btn ${window.currentFilters.includes(l) ? 'active' : ''}`;
+                    b.innerText = l; b.onclick = () => setFilter(l); filtDiv.appendChild(b);
                 });
-            } else {
-                filterContainer.style.display = "none";
-                window.currentFilters = []; 
             }
 
             window.tasks.forEach(task => {
-                const taskLabels = task.labels || [];
-                const subtasks = task.subtasks || []; // 古いデータ互換用
-                
-                // 【変更】AND検索の適用
-                if (window.currentFilters.length > 0) {
-                    const hasAllLabels = window.currentFilters.every(f => taskLabels.includes(f));
-                    if (!hasAllLabels) return;
-                }
+                if (window.currentFilters.length > 0 && !window.currentFilters.every(f => task.labels?.includes(f))) return;
 
-                const safeTitle = task.title.replace(/"/g, '&quot;');
-                const safeLabels = taskLabels.join(', ').replace(/"/g, '&quot;');
-                const labelHTML = taskLabels.map(l => `<span class="label-chip">${l}</span>`).join('');
-
+                const labelHTML = (task.labels || []).map(l => `<span class="label-chip">${l}</span>`).join('');
                 if (task.isArchived) {
-                    const archItem = document.createElement('div');
-                    archItem.className = "archive-item";
-                    archItem.style.display = "flex";
-                    archItem.style.justifyContent = "space-between";
-                    archItem.style.alignItems = "center";
-                    archItem.innerHTML = `
-                        <span>✓ ${task.title} <small>(${task.date || '保留'} ${task.time || ''})</small> ${labelHTML}</span>
-                        <div>
-                            <button onclick="unarchiveTask(${task.id})" style="background:#e5e5ea; color:#333; font-size:10px; padding:2px 5px; margin-right:5px; border:none; border-radius:4px; cursor:pointer;">↩️ 戻す</button>
-                            <button onclick="deleteTask(${task.id})" style="background:none; border:none; cursor:pointer;" title="完全に削除">🗑️</button>
-                        </div>
-                    `;
-                    archiveDiv.appendChild(archItem);
-                    return; 
+                    archDiv.innerHTML += `<div class="archive-item"><span>✓ ${task.title} <small>(${task.date || '保留'} ${task.time || ''})</small> ${labelHTML}</span>
+                        <button onclick="unarchiveTask(${task.id})">↩️</button></div>`;
+                    return;
                 }
 
                 const item = document.createElement('div');
                 item.className = `todo-item ${task.done ? 'done' : ''}`;
-                
                 item.innerHTML = `
                     <div class="todo-main">
                         <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTask(${task.id})">
-                        <div style="flex:1; overflow:hidden;">
-                            <div class="task-text-display" onclick="this.style.display='none'; this.nextElementSibling.style.display='block'; this.nextElementSibling.focus();" style="cursor:text; min-height:1.2em;" title="クリックして編集">${task.title}</div>
-                            <input type="text" class="task-title-edit" value="${safeTitle}" style="display:none; width:95%;" onblur="updateTitle(${task.id}, this.value)" onkeydown="if(event.key==='Enter') {this.blur();}">
-                            
-                            <div style="margin-top: 4px; display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
-                                <input type="date" class="date-edit" value="${task.date}" onchange="updateDate(${task.id}, this.value)">
-                                <input type="time" class="time-edit" value="${task.time || ''}" onchange="updateTime(${task.id}, this.value)">
-                                
-                                ${!task.isBacklog ? `<button onclick="clearDateTime(${task.id})" style="background:#ffebee; color:#c62828; border:none; border-radius:4px; padding:2px 6px; font-size:0.75em; cursor:pointer; margin-right:5px;" title="日時を消去して保留に戻す">✖️</button>` : ''}
-                                
-                                <div style="display:inline-flex; align-items:center;">
-                                    ${labelHTML}
-                                    <input type="text" class="label-edit" style="width:100px;" placeholder="ラベル追加..." value="${safeLabels}" title="カンマ区切りで入力" onblur="updateLabels(${task.id}, this.value)" onkeydown="if(event.key==='Enter') {this.blur();}">
-                                </div>
+                        <div style="flex:1;">
+                            <div class="task-text-display" onclick="this.style.display='none';this.nextElementSibling.style.display='block';this.nextElementSibling.focus();">${task.title}</div>
+                            <input type="text" class="task-title-edit" value="${task.title.replace(/"/g,'&quot;')}" style="display:none;width:95%;" onblur="updateTitle(${task.id},this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                            <div style="margin-top:4px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+                                <input type="date" class="date-edit" value="${task.date}" onchange="updateDate(${task.id},this.value)">
+                                <input type="time" class="time-edit" value="${task.time||''}" onchange="updateTime(${task.id},this.value)">
+                                <span>~</span>
+                                <input type="time" class="time-edit" value="${task.timeEnd||''}" onchange="updateTimeEnd(${task.id},this.value)">
+                                ${!task.isBacklog ? `<button onclick="clearDateTime(${task.id})" style="color:red;border:none;background:none;cursor:pointer;">✖</button>` : ''}
+                                ${labelHTML}
+                                <input type="text" class="label-edit" placeholder="追加..." value="${(task.labels||[]).join(',')}" onblur="updateLabels(${task.id},this.value)" onkeydown="if(event.key==='Enter')this.blur()">
                             </div>
-                            
                             <div class="subtasks-area">
-                                ${subtasks.map(st => `
+                                ${(task.subtasks||[]).map(st => `
                                     <div class="subtask-item">
-                                        <input type="checkbox" ${st.done ? 'checked' : ''} onchange="toggleSubtask(${task.id}, ${st.id})">
-                                        <span class="subtask-text-display" style="flex:1; margin-left:6px; ${st.done ? 'text-decoration:line-through;color:#888;' : ''}">${st.text.replace(/"/g, '&quot;')}</span>
-                                        <button onclick="deleteSubtask(${task.id}, ${st.id})" style="background:none; border:none; color:#bbb; font-size:12px; cursor:pointer;" title="サブタスクを削除">✖</button>
+                                        <input type="checkbox" ${st.done?'checked':''} onchange="toggleSubtask(${task.id},${st.id})">
+                                        <div style="flex:1;margin-left:6px;">
+                                            <span class="subtask-text-display" style="${st.done?'text-decoration:line-through;color:#888;':''}" onclick="this.style.display='none';this.nextElementSibling.style.display='inline-block';this.nextElementSibling.focus();">${st.text}</span>
+                                            <input type="text" class="subtask-edit" value="${st.text.replace(/"/g,'&quot;')}" style="display:none;width:80%;font-size:0.9em;" onblur="updateSubtaskText(${task.id},${st.id},this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                                        </div>
+                                        <button onclick="deleteSubtask(${task.id},${st.id})" style="border:none;background:none;color:#ccc;cursor:pointer;">✖</button>
                                     </div>
                                 `).join('')}
-                                <input type="text" class="subtask-input" placeholder="+ サブタスクを追加 (Enterで確定)" onkeydown="if(event.key==='Enter' && this.value.trim()) { addSubtask(${task.id}, this.value.trim()); this.value=''; }">
+                                <input type="text" class="subtask-input" placeholder="+ サブタスク追加" onkeydown="if(event.key==='Enter'&&this.value.trim()){addSubtask(${task.id},this.value.trim());this.value=''}">
                             </div>
-                            
-                            <button class="memo-toggle" style="background:none;color:var(--accent);border:none;font-size:0.8em;padding:0;text-decoration:underline;cursor:pointer;margin-top:4px;" onclick="toggleMemoView(${task.id})">
-                                ${task.memo ? '📝 メモ表示' : '+ メモ追加'}
-                            </button>
+                            <button class="memo-toggle" style="background:none;color:var(--accent);border:none;font-size:0.8em;cursor:pointer;text-decoration:underline;" onclick="toggleMemoView(${task.id})">${task.memo ? '📝 メモ表示' : '+ メモ追加'}</button>
                         </div>
-                        <div style="display:flex; align-items:center;">
-                            ${task.done ? `<button onclick="archiveTask(${task.id})" style="background:#eee;color:#333;font-size:12px;padding:4px 8px;margin-right:5px;border:none;border-radius:4px;cursor:pointer;">📦</button>` : ''}
-                            <button onclick="deleteTask(${task.id})" style="background:none; border:none; font-size:1.2em; cursor:pointer;" title="完全に削除">🗑️</button>
+                        <div>
+                            ${task.done ? `<button onclick="archiveTask(${task.id})" style="border:none;background:#eee;border-radius:4px;cursor:pointer;">📦</button>` : ''}
+                            <button onclick="deleteTask(${task.id})" style="border:none;background:none;cursor:pointer;">🗑️</button>
                         </div>
                     </div>
-                    <div class="memo-area" id="memo-${task.id}" style="display: ${task.showMemo ? 'block' : 'none'}">
-                        <div class="memo-content-display" onclick="this.nextElementSibling.style.display='block';this.style.display='none';this.nextElementSibling.nextElementSibling.style.display='block'">${task.memo || 'クリックしてメモを入力'}</div>
+                    <div class="memo-area" style="display:${task.showMemo?'block':'none'}">
+                        <div class="memo-content-display" onclick="this.style.display='none';this.nextElementSibling.style.display='block';this.nextElementSibling.nextElementSibling.style.display='block'">${task.memo||'クリックして入力'}</div>
                         <textarea class="memo-edit" style="display:none" rows="3">${task.memo}</textarea>
-                        <button style="display:none;margin-top:5px;font-size:10px;background:var(--accent);color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;" onclick="saveMemo(${task.id}, this.previousElementSibling.value)">保存</button>
+                        <button style="display:none;" onclick="saveMemo(${task.id},this.previousElementSibling.value)">保存</button>
                     </div>
                 `;
-
-                if (task.isBacklog) { 
-                    backlogDiv.appendChild(item); 
-                } else { 
-                    scheduledDiv.appendChild(item); 
-                }
+                task.isBacklog ? backDiv.appendChild(item) : schedDiv.appendChild(item);
             });
 
-            // メインのタスク、メモ、アーカイブ、サブタスクで数式($...$)をレンダリング
-            document.querySelectorAll('.task-text-display, .memo-content-display, .archive-item span, .label-chip, .subtask-text-display').forEach(el => {
-                el.innerHTML = el.innerHTML.replace(/\$(.*?)\$/g, (match, formula) => {
-                    return katex.renderToString(formula, { throwOnError: false });
-                });
+            document.querySelectorAll('.task-text-display, .subtask-text-display, .memo-content-display, .label-chip').forEach(el => {
+                el.innerHTML = el.innerHTML.replace(/\$(.*?)\$/g, (m, f) => katex.renderToString(f, { throwOnError: false }));
             });
-
-            if (shouldSave && typeof window.saveToCloud === "function") {
-                window.saveToCloud();
-            }
+            if (shouldSave) window.saveToCloud();
         };
 
         loadData();
-
     </script>
 </body>
 </html>
