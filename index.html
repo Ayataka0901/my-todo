@@ -29,11 +29,14 @@
         .archive-item { font-size: 0.85em; color: #777; padding: 6px 0; border-bottom: 1px dashed #ddd; display: flex; justify-content: space-between; align-items: center; }
         .task-title-edit, .subtask-edit { font-family: inherit; font-size: 1em; padding: 2px 5px; border: 1px solid var(--accent); border-radius: 4px; }
         .label-chip { background: #e5e5ea; color: #333; border-radius: 10px; padding: 2px 8px; font-size: 0.75em; margin-right: 4px; display: inline-block; font-weight: 500; }
-        .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; padding: 10px; background: #fff; border-radius: 8px; align-items: center; }
-        .filter-btn { background: #f0f0f0; color: #555; border: none; padding: 5px 12px; border-radius: 15px; font-size: 0.85em; cursor: pointer; transition: all 0.2s; }
-        .filter-btn:hover { background: #e0e0e0; }
-        .filter-btn.active { background: var(--accent); color: white; font-weight: bold; }
-        .filter-label-text { font-size: 0.9em; font-weight: bold; color: #666; margin-right: 10px; }
+        
+        /* フィルターバーのデザイン */
+        .filter-bar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding: 15px; background: #fff; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .filter-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .filter-label-text { font-size: 0.85em; font-weight: bold; color: #666; min-width: 80px; }
+        .filter-btn { background: #f0f0f0; color: #555; border: none; padding: 4px 12px; border-radius: 15px; font-size: 0.8em; cursor: pointer; }
+        .filter-btn.active { background: var(--accent); color: white; }
+        
         .subtasks-area { margin-top: 8px; margin-bottom: 4px; padding-left: 10px; border-left: 2px solid #e0e0e0; display: flex; flex-direction: column; gap: 4px; }
         .subtask-item { display: flex; align-items: center; font-size: 0.85em; }
         .subtask-input { font-size: 0.8em; padding: 3px 6px; border: 1px dashed #ccc; border-radius: 4px; width: 80%; background: transparent; }
@@ -61,11 +64,19 @@
             <button onclick="addTask()" style="width:100%; margin-top:5px; font-weight:bold;">タスクを追加</button>
         </div>
 
-        <div id="filter-container" class="filter-bar" style="display:none;"></div>
+        <div class="filter-bar">
+            <div class="filter-row">
+                <span class="filter-label-text">📅 日付表示:</span>
+                <input type="date" id="filter-date" onchange="setDateFilter(this.value)">
+                <button class="filter-btn" onclick="setTodayFilter()">今日</button>
+                <button class="filter-btn" onclick="setDateFilter('')">全表示</button>
+            </div>
+            <div id="label-filter-container" class="filter-row"></div>
+        </div>
 
         <div class="container">
             <div class="list-card">
-                <h3>📅 スケジュール済み</h3>
+                <h3 id="sched-title">📅 スケジュール済み</h3>
                 <div id="scheduled-list"></div>
             </div>
             <div class="list-card">
@@ -105,6 +116,7 @@
 
         window.tasks = [];
         window.currentFilters = [];
+        window.currentDateFilter = ""; // 日付フィルターの状態
 
         async function loadData() {
             try {
@@ -150,6 +162,7 @@
             ["new-task-title", "new-task-date", "new-task-time-start", "new-task-time-end", "new-task-labels", "new-task-memo"].forEach(id => document.getElementById(id).value = "");
         };
 
+        // 操作系関数
         window.toggleTask = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.done = !t.done; render(); } };
         window.updateTitle = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t && val.trim()){ t.title = val; render(); } };
         window.updateDate = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.date = val; t.isBacklog = (val === ""); render(); } };
@@ -160,7 +173,6 @@
         window.unarchiveTask = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.isArchived = false; render(); } };
         window.deleteTask = function(id) { if(confirm("削除しますか？")){ window.tasks = window.tasks.filter(t => t.id !== id); render(); } };
         window.updateLabels = function(id, str) { const t = window.tasks.find(t => t.id === id); if(t){ t.labels = str.split(',').map(l => l.trim()).filter(l => l); render(); } };
-
         window.deleteArchiveByDate = function() {
             const limitDate = document.getElementById('archive-delete-limit-date').value;
             if (!limitDate) { alert("日付を選択してください"); return; }
@@ -170,6 +182,26 @@
             }
         };
 
+        // フィルター操作
+        window.setDateFilter = function(val) {
+            window.currentDateFilter = val;
+            document.getElementById('filter-date').value = val;
+            render(false);
+        };
+        window.setTodayFilter = function() {
+            const today = new Date().toISOString().split('T')[0];
+            window.setDateFilter(today);
+        };
+        window.setFilter = function(label) { 
+            if (label === null) window.currentFilters = [];
+            else {
+                const idx = window.currentFilters.indexOf(label);
+                idx > -1 ? window.currentFilters.splice(idx, 1) : window.currentFilters.push(label);
+            }
+            render(false); 
+        };
+
+        // サブタスク
         window.addSubtask = function(taskId, text) {
             const t = window.tasks.find(t => t.id === taskId);
             if(t) { t.subtasks.push({ id: Date.now() + Math.random(), text, done: false }); render(); }
@@ -193,26 +225,15 @@
         window.saveMemo = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.memo = val; render(); } };
         window.toggleArchive = function() { const el = document.getElementById('archive-wrap'); el.style.display = (el.style.display === 'none') ? 'block' : 'none'; };
 
-        // フィルターボタンの処理（復元）
-        window.setFilter = function(label) { 
-            if (label === null) window.currentFilters = [];
-            else {
-                const idx = window.currentFilters.indexOf(label);
-                idx > -1 ? window.currentFilters.splice(idx, 1) : window.currentFilters.push(label);
-            }
-            render(false); 
-        };
-
         window.render = function(shouldSave = true) {
-            const schedDiv = document.getElementById('scheduled-list'), backDiv = document.getElementById('backlog-list'), archDiv = document.getElementById('archive-list'), filtDiv = document.getElementById('filter-container');
+            const schedDiv = document.getElementById('scheduled-list'), backDiv = document.getElementById('backlog-list'), archDiv = document.getElementById('archive-list'), filtDiv = document.getElementById('label-filter-container');
             [schedDiv, backDiv, archDiv, filtDiv].forEach(d => d.innerHTML = "");
 
-            // ラベルフィルターUIの生成（復元）
+            // ラベルフィルターUI
             const allLabels = new Set();
             window.tasks.forEach(t => t.labels?.forEach(l => allLabels.add(l)));
             if (allLabels.size > 0) {
-                filtDiv.style.display = "flex";
-                filtDiv.innerHTML = `<span class="filter-label-text">🏷️ AND検索:</span>`;
+                filtDiv.innerHTML = `<span class="filter-label-text">🏷️ ラベル検索:</span>`;
                 const btn = document.createElement('button');
                 btn.className = `filter-btn ${window.currentFilters.length === 0 ? 'active' : ''}`;
                 btn.innerText = "すべて"; btn.onclick = () => setFilter(null); filtDiv.appendChild(btn);
@@ -221,29 +242,24 @@
                     b.className = `filter-btn ${window.currentFilters.includes(l) ? 'active' : ''}`;
                     b.innerText = l; b.onclick = () => setFilter(l); filtDiv.appendChild(b);
                 });
-            } else {
-                filtDiv.style.display = "none";
             }
 
-            // スケジュールと保留のソート
+            // ソート
             window.tasks.sort((a, b) => {
                 if (a.isBacklog && b.isBacklog) return b.id - a.id;
                 if (!a.date) return 1; if (!b.date) return -1;
                 return a.date !== b.date ? a.date.localeCompare(b.date) : (a.time || "99:99").localeCompare(b.time || "99:99");
             });
 
-            // 【修正】アーカイブのソート: 古いデータ(archivedAtが無い)でも確実に「新しい(idが大きい)順」にする
-            const archivedTasks = window.tasks.filter(t => t.isArchived).sort((a, b) => {
-                const timeA = a.archivedAt || a.id;
-                const timeB = b.archivedAt || b.id;
-                return timeB - timeA;
-            });
+            const archivedTasks = window.tasks.filter(t => t.isArchived).sort((a, b) => (b.archivedAt || b.id) - (a.archivedAt || a.id));
 
             window.tasks.forEach(task => {
                 if (task.isArchived) return;
                 
-                // フィルターの適用（復元）
+                // 絞り込み条件（ラベル ＋ 日付）
                 if (window.currentFilters.length > 0 && !window.currentFilters.every(f => task.labels?.includes(f))) return;
+                // 日付フィルターがセットされている場合、その日以外のスケジュール済みタスクを非表示
+                if (window.currentDateFilter && !task.isBacklog && task.date !== window.currentDateFilter) return;
 
                 const day = getDayOfWeek(task.date);
                 const item = document.createElement('div');
