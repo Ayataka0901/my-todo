@@ -21,7 +21,7 @@
         }
 
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
             background: var(--main-bg); 
             margin: 0; 
             padding: 20px; 
@@ -50,19 +50,28 @@
         @media (max-width: 800px) { .container { grid-template-columns: 1fr; } }
 
         .list-card { background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); align-self: start; }
-        .todo-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .todo-item { border-bottom: 1px solid #eee; padding: 12px 0; }
         .todo-main { display: flex; align-items: flex-start; gap: 10px; }
         .todo-item.done .task-text-display { text-decoration: line-through; color: #888; }
         
-        /* サブタスク（ここが修正ポイント） */
-        .subtasks-area { margin-top: 8px; margin-bottom: 4px; padding-left: 10px; border-left: 2px solid #e0e0e0; display: flex; flex-direction: column; gap: 4px; }
+        /* サブタスク（横並び修正済み） */
+        .subtasks-area { margin-top: 8px; margin-bottom: 4px; padding-left: 10px; border-left: 2px solid #e0e0e0; display: flex; flex-direction: column; gap: 6px; }
         .subtask-item { display: flex; align-items: center; gap: 8px; font-size: 0.85em; }
         .subtask-text-wrapper { flex: 1; display: flex; align-items: center; }
         .subtask-input { font-size: 0.8em; padding: 4px 8px; border: 1px dashed #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; background: transparent; margin-top: 5px; }
 
-        /* その他パーツ */
+        /* 入力フォーム・編集パーツ */
         .input-group { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        input, button, textarea { border-radius: 6px; border: 1px solid #ccc; padding: 8px; }
+        .task-title-edit, .subtask-edit { font-family: inherit; font-size: 1em; padding: 2px 5px; border: 1px solid var(--accent); border-radius: 4px; }
+        .date-edit, .time-edit, .label-edit { font-size: 0.8em; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9; color: #333; margin-right: 5px; }
+        
+        /* メモエリア */
         .memo-area { margin: 10px 0 0 30px; background: #f9f9f9; padding: 8px; border-radius: 6px; font-size: 0.9em; border-left: 3px solid var(--accent); }
+        .memo-content-display { cursor: pointer; min-height: 1em; white-space: pre-wrap; }
+        .memo-edit { width: 100%; box-sizing: border-box; font-family: monospace; padding: 5px; margin-top: 5px; }
+
+        /* ラベル・フィルタ */
         .label-chip { background: #e5e5ea; color: #333; border-radius: 10px; padding: 2px 8px; font-size: 0.75em; margin-right: 4px; display: inline-block; font-weight: 500; }
         .filter-bar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding: 15px; background: #fff; border-radius: 12px; }
         .filter-btn { background: #f0f0f0; border: none; padding: 4px 12px; border-radius: 15px; font-size: 0.8em; cursor: pointer; }
@@ -81,19 +90,19 @@
         <h1>Research Tasks</h1>
         
         <div class="input-group">
-            <input type="text" id="new-task-title" placeholder="タスク内容" style="flex:3">
+            <input type="text" id="new-task-title" placeholder="タスク内容 (例: $E=mc^2$)" style="flex:3">
             <input type="date" id="new-task-date" style="flex:1">
-            <input type="time" id="new-task-time-start" style="flex:0.6">
+            <input type="time" id="new-task-time-start" style="flex:0.6" title="開始">
             <span>~</span>
-            <input type="time" id="new-task-time-end" style="flex:0.6">
-            <input type="text" id="new-task-labels" placeholder="ラベル" style="flex:1">
-            <textarea id="new-task-memo" placeholder="メモ" style="flex:100%; margin-top:5px;" rows="2"></textarea>
+            <input type="time" id="new-task-time-end" style="flex:0.6" title="終了">
+            <input type="text" id="new-task-labels" placeholder="ラベル (カンマ区切り)" style="flex:1">
+            <textarea id="new-task-memo" placeholder="メモ（任意）" style="flex:100%; margin-top:5px;" rows="2"></textarea>
             <button onclick="addTask()" style="width:100%; margin-top:5px; background:var(--accent); color:white; border:none; padding:10px; border-radius:6px; font-weight:bold; cursor:pointer;">タスクを追加</button>
         </div>
 
         <div class="filter-bar">
-            <div style="display:flex; gap:8px; align-items:center;">
-                <span style="font-size:0.8em; font-weight:bold;">📅 日付:</span>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <span style="font-size:0.8em; font-weight:bold; color:#666;">📅 日付表示:</span>
                 <input type="date" id="filter-date" onchange="setDateFilter(this.value)">
                 <button class="filter-btn" onclick="setTodayFilter()">今日</button>
                 <button class="filter-btn" onclick="setDateFilter('')">全表示</button>
@@ -103,7 +112,7 @@
 
         <div class="container">
             <div class="list-card">
-                <h3>📅 スケジュール済み</h3>
+                <h3 id="sched-title">📅 スケジュール済み</h3>
                 <div id="scheduled-list"></div>
             </div>
             <div class="list-card">
@@ -111,9 +120,9 @@
                 <div id="backlog-list"></div>
             </div>
             
-            <div class="archive-section" style="grid-column: 1/-1; margin-top:20px;">
-                <h4 onclick="toggleArchive()" style="cursor:pointer; color:#888;">📦 アーカイブ済み (クリックで開閉)</h4>
-                <div id="archive-wrap" style="display:none; padding-top:10px;">
+            <div class="archive-section" style="grid-column: 1 / -1; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 10px;">
+                <h4 onclick="toggleArchive()" style="cursor:pointer; color:#888;">📦 アーカイブ済みタスク (クリックで開閉)</h4>
+                <div id="archive-wrap" style="display:none">
                     <div id="archive-list"></div>
                 </div>
             </div>
@@ -124,7 +133,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-         const firebaseConfig = {
+        const firebaseConfig = {
             apiKey: "AIzaSyDjnlxV-O5KXmTPlNRmyYIngygjyjvWSEY",
             authDomain: "my-research-todo.firebaseapp.com",
             projectId: "my-research-todo",
@@ -141,7 +150,7 @@
         window.currentFilters = [];
         window.currentDateFilter = "";
 
-        // 認証
+        // 認証ロジック
         window.checkPass = function() {
             if (document.getElementById('pass-input').value === "lab123") { 
                 document.getElementById('auth-overlay').style.display = 'none';
@@ -158,31 +167,45 @@
         }
 
         window.saveToCloud = async function() {
-            try { await setDoc(doc(db, "todo_lists", userDocId), { tasks: window.tasks, updatedAt: new Date() }); } catch (e) { }
+            try { await setDoc(doc(db, "todo_lists", userDocId), { tasks: window.tasks, updatedAt: new Date() }); } 
+            catch (e) { console.error(e); }
         };
 
-        // タスク操作ロジック (addTask, toggleTask 等)
+        // --- データ操作関数 (完全復元) ---
+        function getDayOfWeek(dateStr) {
+            if (!dateStr) return "";
+            const days = ['日', '月', '火', '水', '木', '金', '土'];
+            const date = new Date(dateStr);
+            return isNaN(date.getTime()) ? "" : `(${days[date.getDay()]})`;
+        }
+
         window.addTask = function() {
             const title = document.getElementById('new-task-title').value;
             const date = document.getElementById('new-task-date').value;
+            const memo = document.getElementById('new-task-memo').value;
             if (!title) return;
+
             window.tasks.push({
-                id: Date.now(), title, date,
-                memo: document.getElementById('new-task-memo').value,
+                id: Date.now(), title, memo, date, 
                 time: document.getElementById('new-task-time-start').value || "", 
                 timeEnd: document.getElementById('new-task-time-end').value || "", 
                 labels: document.getElementById('new-task-labels').value.split(',').map(l=>l.trim()).filter(l=>l),
-                subtasks: [], isBacklog: date === "", done: false, showMemo: false, isArchived: false
+                subtasks: [], isBacklog: date === "", done: false, showMemo: memo !== "", isArchived: false
             });
             render();
-            ["new-task-title", "new-task-memo", "new-task-labels"].forEach(id => document.getElementById(id).value = "");
+            ["new-task-title", "new-task-date", "new-task-time-start", "new-task-time-end", "new-task-labels", "new-task-memo"].forEach(id => document.getElementById(id).value = "");
         };
 
         window.toggleTask = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.done = !t.done; render(); } };
+        window.updateTitle = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t && val.trim()){ t.title = val; render(); } };
+        window.updateDate = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.date = val; t.isBacklog = (val === ""); render(); } };
+        window.updateTime = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.time = val; render(); } };
+        window.updateTimeEnd = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.timeEnd = val; render(); } };
+        window.updateLabels = function(id, str) { const t = window.tasks.find(t => t.id === id); if(t){ t.labels = str.split(',').map(l => l.trim()).filter(l => l); render(); } };
+        window.clearDateTime = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.date = ""; t.time = ""; t.timeEnd = ""; t.isBacklog = true; render(); } };
         window.deleteTask = function(id) { if(confirm("削除しますか？")){ window.tasks = window.tasks.filter(t => t.id !== id); render(); } };
         window.archiveTask = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.isArchived = true; render(); } };
         window.unarchiveTask = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.isArchived = false; render(); } };
-        window.toggleMemoView = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.showMemo = !t.showMemo; render(); } };
         
         window.addSubtask = function(taskId, text) {
             const t = window.tasks.find(t => t.id === taskId);
@@ -193,59 +216,123 @@
             const st = t?.subtasks.find(s => s.id === subId);
             if(st){ st.done = !st.done; render(); }
         };
+        window.updateSubtaskText = function(taskId, subId, val) {
+            const t = window.tasks.find(t => t.id === taskId);
+            const st = t?.subtasks.find(s => s.id === subId);
+            if(st && val.trim()){ st.text = val; render(); }
+        };
         window.deleteSubtask = function(taskId, subId) {
             const t = window.tasks.find(t => t.id === taskId);
             if(t){ t.subtasks = t.subtasks.filter(s => s.id !== subId); render(); }
         };
 
-        window.setDateFilter = function(v) { window.currentDateFilter = v; render(false); };
+        window.toggleMemoView = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.showMemo = !t.showMemo; render(); } };
+        window.saveMemo = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t){ t.memo = val; render(); } };
+        
+        window.setDateFilter = function(val) { window.currentDateFilter = val; render(false); };
         window.setTodayFilter = function() { window.setDateFilter(new Date().toISOString().split('T')[0]); };
+        window.setFilter = function(label) { 
+            if (label === null) window.currentFilters = [];
+            else {
+                const idx = window.currentFilters.indexOf(label);
+                idx > -1 ? window.currentFilters.splice(idx, 1) : window.currentFilters.push(label);
+            }
+            render(false); 
+        };
         window.toggleArchive = function() { const el = document.getElementById('archive-wrap'); el.style.display = (el.style.display==='none')?'block':'none'; };
 
-        // 描画
+        // --- 描画関数 (完全復元 & サブタスク修正) ---
         window.render = function(shouldSave = true) {
-            const schedDiv = document.getElementById('scheduled-list'), backDiv = document.getElementById('backlog-list'), archDiv = document.getElementById('archive-list');
-            [schedDiv, backDiv, archDiv].forEach(d => d.innerHTML = "");
+            const schedDiv = document.getElementById('scheduled-list'), backDiv = document.getElementById('backlog-list'), archDiv = document.getElementById('archive-list'), filtDiv = document.getElementById('label-filter-container');
+            [schedDiv, backDiv, archDiv, filtDiv].forEach(d => d.innerHTML = "");
+
+            // ラベルフィルターUI
+            const allLabels = new Set();
+            window.tasks.forEach(t => t.labels?.forEach(l => allLabels.add(l)));
+            if (allLabels.size > 0) {
+                allLabels.forEach(l => {
+                    const b = document.createElement('button');
+                    b.className = `filter-btn ${window.currentFilters.includes(l) ? 'active' : ''}`;
+                    b.innerText = l; b.onclick = () => setFilter(l); filtDiv.appendChild(b);
+                });
+            }
+
+            // ソート
+            window.tasks.sort((a, b) => {
+                if (a.isBacklog && b.isBacklog) return b.id - a.id;
+                if (!a.date) return 1; if (!b.date) return -1;
+                return a.date !== b.date ? a.date.localeCompare(b.date) : (a.time || "99:99").localeCompare(b.time || "99:99");
+            });
 
             window.tasks.forEach(task => {
                 if (task.isArchived) {
-                    archDiv.innerHTML += `<div style="font-size:0.8em; margin-bottom:5px;">✓ ${task.title} <button onclick="unarchiveTask(${task.id})">戻す</button></div>`;
+                    archDiv.innerHTML += `<div style="font-size:0.85em; color:#777; margin-bottom:5px;">✓ ${task.title} <button onclick="unarchiveTask(${task.id})" style="border:none;background:none;color:blue;cursor:pointer;">戻す</button></div>`;
                     return;
                 }
+                if (window.currentFilters.length > 0 && !window.currentFilters.every(f => task.labels?.includes(f))) return;
                 if (window.currentDateFilter && !task.isBacklog && task.date !== window.currentDateFilter) return;
 
+                const day = getDayOfWeek(task.date);
                 const item = document.createElement('div');
                 item.className = `todo-item ${task.done ? 'done' : ''}`;
                 item.innerHTML = `
                     <div class="todo-main">
                         <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTask(${task.id})">
                         <div style="flex:1;">
-                            <div class="task-text-display">${task.title}</div>
-                            <div style="font-size:0.75em; color:#888;">${task.date || '保留'} ${task.time||''}</div>
+                            <div class="task-text-display" onclick="this.style.display='none';this.nextElementSibling.style.display='block';this.nextElementSibling.focus();">${task.title}</div>
+                            <input type="text" class="task-title-edit" value="${task.title.replace(/"/g,'&quot;')}" style="display:none;width:95%;" onblur="updateTitle(${task.id},this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                            
+                            <div style="margin-top:4px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+                                <input type="date" class="date-edit" value="${task.date}" onblur="updateDate(${task.id},this.value)">
+                                <span style="font-size:0.8em; color:#666;">${day}</span>
+                                <input type="time" class="time-edit" value="${task.time||''}" onblur="updateTime(${task.id},this.value)">
+                                <span>~</span>
+                                <input type="time" class="time-edit" value="${task.timeEnd||''}" onblur="updateTimeEnd(${task.id},this.value)">
+                                ${!task.isBacklog ? `<button onclick="clearDateTime(${task.id})" style="color:red;border:none;background:none;cursor:pointer;font-size:10px;">✖</button>` : ''}
+                                ${(task.labels||[]).map(l => `<span class="label-chip">${l}</span>`).join('')}
+                                <input type="text" class="label-edit" placeholder="ラベル..." value="${(task.labels||[]).join(',')}" onblur="updateLabels(${task.id},this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+                            </div>
+
                             <div class="subtasks-area">
                                 ${(task.subtasks||[]).map(st => `
                                     <div class="subtask-item">
                                         <input type="checkbox" ${st.done?'checked':''} onchange="toggleSubtask(${task.id},${st.id})">
                                         <div class="subtask-text-wrapper">
-                                            <span style="${st.done?'text-decoration:line-through;color:#888;':''}">${st.text}</span>
+                                            <span class="subtask-text-display" style="${st.done?'text-decoration:line-through;color:#888;':''}" onclick="this.style.display='none';this.nextElementSibling.style.display='inline-block';this.nextElementSibling.focus();">${st.text}</span>
+                                            <input type="text" class="subtask-edit" value="${st.text.replace(/"/g,'&quot;')}" style="display:none;width:100%;font-size:0.9em;" onblur="updateSubtaskText(${task.id},${st.id},this.value)" onkeydown="if(event.key==='Enter')this.blur()">
                                         </div>
                                         <button onclick="deleteSubtask(${task.id},${st.id})" style="border:none;background:none;color:#ccc;cursor:pointer;">&times;</button>
                                     </div>
                                 `).join('')}
                                 <input type="text" class="subtask-input" placeholder="+ サブタスク追加" onkeydown="if(event.key==='Enter'&&this.value.trim()){addSubtask(${task.id},this.value.trim());this.value=''}">
                             </div>
+
+                            <button style="background:none;color:var(--accent);border:none;font-size:0.8em;cursor:pointer;text-decoration:underline;padding:0;" onclick="toggleMemoView(${task.id})">${task.memo ? '📝 メモ表示' : '+ メモ追加'}</button>
                         </div>
-                        <button onclick="deleteTask(${task.id})" style="border:none;background:none;cursor:pointer;">🗑️</button>
+                        <div style="display:flex; flex-direction:column; gap:5px;">
+                            ${task.done ? `<button onclick="archiveTask(${task.id})" style="border:none;background:#eee;border-radius:4px;cursor:pointer;padding:2px 5px;">📦</button>` : ''}
+                            <button onclick="deleteTask(${task.id})" style="border:none;background:none;cursor:pointer;padding:2px 5px;">🗑️</button>
+                        </div>
+                    </div>
+
+                    <div class="memo-area" style="display:${task.showMemo?'block':'none'}">
+                        <div class="memo-content-display" onclick="this.style.display='none';this.nextElementSibling.style.display='block';this.nextElementSibling.nextElementSibling.style.display='block'">${task.memo||'クリックして入力'}</div>
+                        <textarea class="memo-edit" style="display:none" rows="3">${task.memo}</textarea>
+                        <button style="display:none; margin-top:5px; font-size:0.8em;" onclick="saveMemo(${task.id},this.previousElementSibling.value)">保存</button>
                     </div>
                 `;
                 task.isBacklog ? backDiv.appendChild(item) : schedDiv.appendChild(item);
             });
 
-            document.querySelectorAll('.task-text-display').forEach(el => {
+            // 数式レンダリング
+            document.querySelectorAll('.task-text-display, .subtask-text-display, .memo-content-display, .label-chip').forEach(el => {
                 el.innerHTML = el.innerHTML.replace(/\$(.*?)\$/g, (m, f) => katex.renderToString(f, { throwOnError: false }));
             });
+
             if (shouldSave) window.saveToCloud();
         };
+
+        loadData();
     </script>
 </body>
 </html>
