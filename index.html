@@ -3,55 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Research ToDo</title>
+    <title>Research ToDo Pro</title>
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
     <style>
-        :root { --main-bg: #f5f5f7; --card-bg: #ffffff; --accent: #007aff; }
-        body { font-family: -apple-system, sans-serif; background: var(--main-bg); margin: 0; padding: 20px; color: #333; }
-        #auth-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; }
+        /* 配色と共通変数の定義 */
+        :root { 
+            --main-bg: #f5f5f7; 
+            --card-bg: #ffffff; 
+            --accent: #007aff; 
+            --border: #d1d1d6;
+            --text-main: #333;
+        }
+
+        /* 全体レイアウト */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--main-bg); 
+            margin: 0; 
+            padding: 20px; 
+            color: var(--text-main); 
+        }
+
+        /* 認証画面（memoアプリと統一） */
+        #auth-overlay { 
+            position: fixed; 
+            top:0; left:0; 
+            width:100%; height:100%; 
+            background: #fff; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 1000; 
+        }
+        #auth-overlay input[type="password"] { 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid #ccc; 
+            width: 220px; 
+            margin-bottom: 15px; 
+            font-size: 16px;
+        }
+        .login-btn { 
+            padding: 10px 24px; 
+            background: var(--accent); 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 14px;
+            transition: opacity 0.2s;
+        }
+        .login-btn:hover { opacity: 0.8; }
+
+        /* メインコンテンツの構成 */
         #main-content { display: none; max-width: 1000px; margin: 0 auto; }
         .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 800px) { .container { grid-template-columns: 1fr; } }
-        .list-card { background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); align-self: start; }
+
+        /* 各種パーツのデザイン */
+        .list-card { background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); align-self: start; }
         .todo-item { border-bottom: 1px solid #eee; padding: 10px 0; }
         .todo-main { display: flex; align-items: flex-start; gap: 10px; }
         .todo-item.done .task-text-display { text-decoration: line-through; color: #888; }
+        
+        /* メモ・サブタスクのデザイン */
         .memo-area { margin: 10px 0 0 30px; background: #f9f9f9; padding: 8px; border-radius: 6px; font-size: 0.9em; border-left: 3px solid var(--accent); }
         .memo-content-display { cursor: pointer; min-height: 1em; white-space: pre-wrap; }
         .memo-edit { width: 100%; box-sizing: border-box; font-family: monospace; padding: 5px; margin-top: 5px; }
-        .input-group { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; background: #fff; padding: 15px; border-radius: 12px; }
-        input, button, textarea { border-radius: 6px; border: 1px solid #ccc; padding: 8px; }
-        button { background: var(--accent); color: white; border: none; cursor: pointer; }
-        .date-edit, .time-edit, .label-edit { font-size: 0.8em; padding: 2px 4px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9; color: #333; margin-right: 5px; }
-        .archive-section { grid-column: 1 / -1; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 10px; }
-        .bulk-delete-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 15px; padding: 12px; background: #fffaf0; border-radius: 8px; border: 1px solid #ffe0b2; }
-        .archive-item { font-size: 0.85em; color: #777; padding: 6px 0; border-bottom: 1px dashed #ddd; display: flex; justify-content: space-between; align-items: center; }
-        .task-title-edit, .subtask-edit { font-family: inherit; font-size: 1em; padding: 2px 5px; border: 1px solid var(--accent); border-radius: 4px; }
-        .label-chip { background: #e5e5ea; color: #333; border-radius: 10px; padding: 2px 8px; font-size: 0.75em; margin-right: 4px; display: inline-block; font-weight: 500; }
         
-        /* フィルターバーのデザイン */
+        /* 入力フォーム */
+        .input-group { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        input, button, textarea { border-radius: 6px; border: 1px solid #ccc; padding: 8px; }
+        .add-btn { background: var(--accent); color: white; border: none; cursor: pointer; font-weight: bold; }
+        
+        /* ラベル・チップ */
+        .label-chip { background: #e5e5ea; color: #333; border-radius: 10px; padding: 2px 8px; font-size: 0.75em; margin-right: 4px; display: inline-block; font-weight: 500; }
         .filter-bar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding: 15px; background: #fff; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         .filter-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .filter-label-text { font-size: 0.85em; font-weight: bold; color: #666; min-width: 80px; }
         .filter-btn { background: #f0f0f0; color: #555; border: none; padding: 4px 12px; border-radius: 15px; font-size: 0.8em; cursor: pointer; }
         .filter-btn.active { background: var(--accent); color: white; }
-        
+
         .subtasks-area { margin-top: 8px; margin-bottom: 4px; padding-left: 10px; border-left: 2px solid #e0e0e0; display: flex; flex-direction: column; gap: 4px; }
-        .subtask-item { display: flex; align-items: center; font-size: 0.85em; }
-        .subtask-input { font-size: 0.8em; padding: 3px 6px; border: 1px dashed #ccc; border-radius: 4px; width: 80%; background: transparent; }
     </style>
 </head>
 <body>
 
     <div id="auth-overlay">
-        <h2>Research Task Manager</h2>
-        <input type="password" id="pass-input" placeholder="パスワードを入力">
-        <button onclick="checkPass()" style="margin-top:10px">ログイン</button>
+        <h2 style="margin-bottom: 20px; color: #333;">Research ToDo Pro</h2>
+        <input type="password" id="pass-input" placeholder="Password">
+        <button class="login-btn" onclick="checkPass()">Login</button>
     </div>
 
     <div id="main-content">
-        <h1>Research Tasks</h1>
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h1 style="margin: 0; font-size: 1.5em;">Research Tasks</h1>
+            <span id="sync-status" style="font-size: 0.8em; color: #888;">Firebase Connected</span>
+        </header>
         
         <div class="input-group">
             <input type="text" id="new-task-title" placeholder="タスク内容 (例: $E=mc^2$)" style="flex:3">
@@ -61,12 +113,12 @@
             <input type="time" id="new-task-time-end" style="flex:0.6" title="終了">
             <input type="text" id="new-task-labels" placeholder="ラベル (カンマ区切り)" style="flex:1">
             <textarea id="new-task-memo" placeholder="メモ（任意）" style="flex:100%; margin-top:5px;" rows="2"></textarea>
-            <button onclick="addTask()" style="width:100%; margin-top:5px; font-weight:bold;">タスクを追加</button>
+            <button class="add-btn" onclick="addTask()" style="width:100%; margin-top:5px; padding: 10px;">タスクを追加</button>
         </div>
 
         <div class="filter-bar">
             <div class="filter-row">
-                <span class="filter-label-text">📅 日付表示:</span>
+                <span style="font-size: 0.8em; font-weight: bold; color: #666;">📅 日付表示:</span>
                 <input type="date" id="filter-date" onchange="setDateFilter(this.value)">
                 <button class="filter-btn" onclick="setTodayFilter()">今日</button>
                 <button class="filter-btn" onclick="setDateFilter('')">全表示</button>
@@ -79,18 +131,19 @@
                 <h3 id="sched-title">📅 スケジュール済み</h3>
                 <div id="scheduled-list"></div>
             </div>
+            
             <div class="list-card">
                 <h3>📥 保留（Backlog）</h3>
                 <div id="backlog-list"></div>
             </div>
             
-            <div class="archive-section">
-                <h4 onclick="toggleArchive()" style="cursor:pointer">📦 アーカイブ済みタスク (クリックで開閉)</h4>
-                <div id="archive-wrap" style="display:none">
-                    <div class="bulk-delete-bar">
-                        <span>指定日以前を完全に削除:</span>
+            <div class="archive-section" style="grid-column: 1 / -1; margin-top: 30px;">
+                <h4 onclick="toggleArchive()" style="cursor:pointer; color: #666;">📦 アーカイブ済みタスク (クリックで開閉)</h4>
+                <div id="archive-wrap" style="display:none; background: #eee; padding: 15px; border-radius: 8px;">
+                    <div style="margin-bottom: 10px;">
+                        <span style="font-size: 0.8em;">指定日以前を完全に削除:</span>
                         <input type="date" id="archive-delete-limit-date">
-                        <button onclick="deleteArchiveByDate()" style="background:#ff3b30; font-size:0.85em; color:white;">指定日以前を消去</button>
+                        <button onclick="deleteArchiveByDate()" style="background:#ff3b30; font-size:0.8em; color:white; border:none; padding: 4px 10px; border-radius: 4px;">実行</button>
                     </div>
                     <div id="archive-list"></div>
                 </div>
@@ -98,6 +151,7 @@
         </div>
     </div>
 
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -110,6 +164,7 @@
             messagingSenderId: "23018762664",
             appId: "1:23018762664:web:7aa9046b27f18181d5ed9d"
         };
+        
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const userDocId = "my-research-tasks";
@@ -126,12 +181,12 @@
         }
 
         window.saveToCloud = async function() {
-            try { await setDoc(doc(db, "todo_lists", userDocId), { tasks: window.tasks, updatedAt: new Date() }); } 
+            try { await setDoc(doc(db, "todo_lists", userDocId), { tasks: window.tasks, updatedAt: new Date() }); }
             catch (e) { console.error(e); }
         };
 
         window.checkPass = function() {
-            if (document.getElementById('pass-input').value === "lab123") { 
+            if (document.getElementById('pass-input').value === "lab123") {
                 document.getElementById('auth-overlay').style.display = 'none';
                 document.getElementById('main-content').style.display = 'block';
             } else { alert("パスワードが違います"); }
@@ -151,9 +206,9 @@
             if (!title) return;
 
             window.tasks.push({
-                id: Date.now(), title, memo, date, 
-                time: document.getElementById('new-task-time-start').value || "", 
-                timeEnd: document.getElementById('new-task-time-end').value || "", 
+                id: Date.now(), title, memo, date,
+                time: document.getElementById('new-task-time-start').value || "",
+                timeEnd: document.getElementById('new-task-time-end').value || "",
                 labels: document.getElementById('new-task-labels').value.split(',').map(l=>l.trim()).filter(l=>l),
                 subtasks: [], isBacklog: date === "", done: false, showMemo: memo !== "", isArchived: false,
                 archivedAt: null
@@ -161,7 +216,7 @@
             render();
             ["new-task-title", "new-task-date", "new-task-time-start", "new-task-time-end", "new-task-labels", "new-task-memo"].forEach(id => document.getElementById(id).value = "");
         };
-
+        
         // 操作系関数
         window.toggleTask = function(id) { const t = window.tasks.find(t => t.id === id); if(t){ t.done = !t.done; render(); } };
         window.updateTitle = function(id, val) { const t = window.tasks.find(t => t.id === id); if(t && val.trim()){ t.title = val; render(); } };
@@ -192,13 +247,13 @@
             const today = new Date().toISOString().split('T')[0];
             window.setDateFilter(today);
         };
-        window.setFilter = function(label) { 
+        window.setFilter = function(label) {
             if (label === null) window.currentFilters = [];
             else {
                 const idx = window.currentFilters.indexOf(label);
                 idx > -1 ? window.currentFilters.splice(idx, 1) : window.currentFilters.push(label);
             }
-            render(false); 
+            render(false);
         };
 
         // サブタスク
@@ -328,4 +383,4 @@
         loadData();
     </script>
 </body>
-</html>
+</html> 
